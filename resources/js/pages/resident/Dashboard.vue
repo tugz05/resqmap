@@ -6,11 +6,10 @@ import {
     CheckCircle2,
     ChevronRight,
     Clock,
+    Siren,
     Home,
     Map,
-    Plus,
     Settings,
-    User,
     FileText,
 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -217,7 +216,7 @@ const firstName = computed(() => user.value.name.split(' ')[0]);
         </div>
 
         <!-- MAP TAB ──────────────────────────────────────────────────────── -->
-        <div v-show="activeTab === 'map'" class="h-[calc(100svh-8rem)]">
+        <div v-if="activeTab === 'map'" class="h-[calc(100svh-8rem)]">
             <ResidentMap :incidents="incidentList" />
         </div>
 
@@ -320,72 +319,70 @@ const firstName = computed(() => user.value.name.split(' ')[0]);
 
         <!-- ═══ BOTTOM NAVIGATION BAR ═══════════════════════════════════════ -->
         <nav class="fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-5">
-            <div class="relative flex w-full max-w-sm items-center justify-around rounded-[2rem] bg-[#111827] px-3 py-3.5 shadow-2xl shadow-black/40">
+            <div class="bottom-nav-shell relative grid w-full max-w-sm grid-cols-5 items-center gap-1 px-2.5 py-3">
 
                 <!-- Home -->
                 <button
-                    class="flex flex-col items-center gap-1 px-3 py-1 transition-colors"
-                    :class="activeTab === 'home' ? 'text-white' : 'text-slate-500'"
+                    class="bottom-nav-item flex flex-col items-center gap-1 px-2 py-1.5 transition-colors"
+                    :class="activeTab === 'home' ? 'is-active text-white' : 'text-slate-500'"
                     @click="activeTab = 'home'"
                 >
                     <Home class="h-5 w-5" />
                     <span class="text-[9px] font-medium">Home</span>
-                    <span v-if="activeTab === 'home'" class="mt-0.5 h-1 w-1 rounded-full bg-white" />
+                    <span v-if="activeTab === 'home'" class="mt-0.5 h-1 w-1 rounded-full bg-sky-300" />
                     <span v-else class="mt-0.5 h-1 w-1" />
                 </button>
 
                 <!-- Map -->
                 <button
-                    class="flex flex-col items-center gap-1 px-3 py-1 transition-colors"
-                    :class="activeTab === 'map' ? 'text-white' : 'text-slate-500'"
+                    class="bottom-nav-item flex flex-col items-center gap-1 px-2 py-1.5 transition-colors"
+                    :class="activeTab === 'map' ? 'is-active text-white' : 'text-slate-500'"
                     @click="activeTab = 'map'"
                 >
                     <Map class="h-5 w-5" />
                     <span class="text-[9px] font-medium">Live Map</span>
-                    <span v-if="activeTab === 'map'" class="mt-0.5 h-1 w-1 rounded-full bg-white" />
+                    <span v-if="activeTab === 'map'" class="mt-0.5 h-1 w-1 rounded-full bg-sky-300" />
                     <span v-else class="mt-0.5 h-1 w-1" />
                 </button>
 
-                <!-- Center spacer for FAB -->
-                <div class="w-16 shrink-0" />
+                <!-- Center Report (same row, bigger than others) -->
+                <button
+                    class="bottom-nav-item report-nav-item flex flex-col items-center gap-0.5 px-2 py-1.5 transition-transform duration-200 active:scale-95"
+                    @click="showReport = true"
+                    aria-label="Report an emergency"
+                >
+                    <span class="report-fab relative flex h-[2.8rem] w-[2.8rem] items-center justify-center rounded-full shadow-xl shadow-rose-600/45">
+                        <span class="absolute inset-0 rounded-full bg-rose-400/45 animate-ping" />
+                        <span class="absolute inset-0 rounded-full bg-gradient-to-br from-orange-400 via-rose-500 to-pink-600" />
+                        <Siren class="relative z-10 h-[18px] w-[18px] text-white drop-shadow" />
+                    </span>
+                    <span class="text-[9px] font-semibold text-slate-200">Report</span>
+                </button>
 
                 <!-- History -->
                 <button
-                    class="flex flex-col items-center gap-1 px-3 py-1 transition-colors"
-                    :class="activeTab === 'history' ? 'text-white' : 'text-slate-500'"
+                    class="bottom-nav-item flex flex-col items-center gap-1 px-2 py-1.5 transition-colors"
+                    :class="activeTab === 'history' ? 'is-active text-white' : 'text-slate-500'"
                     @click="activeTab = 'history'"
                 >
                     <FileText class="h-5 w-5" />
                     <span class="text-[9px] font-medium">History</span>
-                    <span v-if="activeTab === 'history'" class="mt-0.5 h-1 w-1 rounded-full bg-white" />
+                    <span v-if="activeTab === 'history'" class="mt-0.5 h-1 w-1 rounded-full bg-sky-300" />
                     <span v-else class="mt-0.5 h-1 w-1" />
                 </button>
 
                 <!-- Settings -->
                 <button
-                    class="flex flex-col items-center gap-1 px-3 py-1 transition-colors"
-                    :class="activeTab === 'settings' ? 'text-white' : 'text-slate-500'"
+                    class="bottom-nav-item flex flex-col items-center gap-1 px-2 py-1.5 transition-colors"
+                    :class="activeTab === 'settings' ? 'is-active text-white' : 'text-slate-500'"
                     @click="activeTab = 'settings'"
                 >
                     <Settings class="h-5 w-5" />
                     <span class="text-[9px] font-medium">Settings</span>
-                    <span v-if="activeTab === 'settings'" class="mt-0.5 h-1 w-1 rounded-full bg-white" />
+                    <span v-if="activeTab === 'settings'" class="mt-0.5 h-1 w-1 rounded-full bg-sky-300" />
                     <span v-else class="mt-0.5 h-1 w-1" />
                 </button>
 
-                <!-- ═══ CENTER FAB — Report Button ═════════════════════════ -->
-                <button
-                    class="report-fab absolute -top-7 left-1/2 flex h-[3.75rem] w-[3.75rem] -translate-x-1/2 items-center justify-center rounded-full shadow-2xl shadow-rose-600/60 transition-transform duration-200 active:scale-90"
-                    @click="showReport = true"
-                    aria-label="Report an emergency"
-                >
-                    <!-- Gradient fill -->
-                    <span class="absolute inset-0 rounded-full bg-gradient-to-br from-orange-400 via-rose-500 to-pink-600" />
-                    <!-- Pulse ring -->
-                    <span class="absolute inset-0 rounded-full bg-rose-500/50 animate-ping" />
-                    <!-- Icon -->
-                    <Plus class="relative z-10 h-7 w-7 text-white" />
-                </button>
             </div>
         </nav>
 
@@ -399,12 +396,48 @@ const firstName = computed(() => user.value.name.split(' ')[0]);
 </template>
 
 <style scoped>
+.bottom-nav-shell {
+    border-radius: 1.8rem;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: linear-gradient(180deg, rgba(7, 24, 91, 0.97), rgba(4, 20, 80, 0.99));
+    box-shadow:
+        0 22px 40px rgba(2, 6, 23, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    overflow: visible;
+}
+
+.bottom-nav-item {
+    position: relative;
+    border-radius: 0.8rem;
+    min-height: 54px;
+    justify-content: center;
+    z-index: 2;
+}
+
+.bottom-nav-item.is-active {
+    background: rgba(15, 118, 110, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.16);
+}
+
+.report-nav-item {
+    min-height: 54px;
+}
+
 .report-fab::before {
     content: '';
     position: absolute;
-    inset: -4px;
+    inset: -3px;
     border-radius: 9999px;
     background: linear-gradient(135deg, rgba(251, 146, 60, 0.3), rgba(244, 63, 94, 0.3));
     z-index: -1;
+}
+
+.report-fab::after {
+    /* subtle hard rim for professional finish */
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
 }
 </style>

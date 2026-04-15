@@ -155,9 +155,25 @@ async function speakWithOpenAI(text: string): Promise<void> {
 
     // Cancel any active speech
     stopSpeaking();
+    const plainText = stripMarkdown(text);
+    let browserFallbackUsed = false;
+
+    const startBrowserFallback = (): void => {
+        if (browserFallbackUsed) return;
+        browserFallbackUsed = true;
+        speakBrowser(plainText);
+    };
+
+    // If OpenAI TTS takes too long, start speaking immediately via browser TTS.
+    const fallbackTimer = setTimeout(() => {
+        if (!isSpeaking.value) startBrowserFallback();
+    }, 700);
+
+    // Hard timeout for slow network/API responses.
+    const controller = new AbortController();
+    const requestTimeout = setTimeout(() => controller.abort(), 4500);
 
     try {
-        isSpeaking.value = true;
         const res = await fetch('/api/v1/ai/tts', {
             method: 'POST',
             headers: {
@@ -165,11 +181,16 @@ async function speakWithOpenAI(text: string): Promise<void> {
                 'X-CSRF-TOKEN': getCsrfToken(),
                 Accept: 'audio/mpeg',
             },
-            body: JSON.stringify({ text: stripMarkdown(text) }),
+            body: JSON.stringify({ text: plainText }),
             credentials: 'include',
+            signal: controller.signal,
         });
 
         if (!res.ok) throw new Error('TTS error');
+
+        // Browser fallback already started; avoid double-speaking.
+        if (browserFallbackUsed) return;
+
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         currentAudio = new Audio(url);
@@ -177,12 +198,17 @@ async function speakWithOpenAI(text: string): Promise<void> {
             isSpeaking.value = false;
             URL.revokeObjectURL(url);
         };
-        currentAudio.onerror = () => { isSpeaking.value = false; };
+        currentAudio.onerror = () => {
+            isSpeaking.value = false;
+            if (!browserFallbackUsed) startBrowserFallback();
+        };
+        isSpeaking.value = true;
         await currentAudio.play();
     } catch {
-        isSpeaking.value = false;
-        // Silently fall back to browser TTS
-        speakBrowser(text);
+        if (!browserFallbackUsed) startBrowserFallback();
+    } finally {
+        clearTimeout(fallbackTimer);
+        clearTimeout(requestTimeout);
     }
 }
 
@@ -507,8 +533,12 @@ onUnmounted(() => {
             <div class="flex shrink-0 items-center justify-between border-b border-white/8 px-4 py-3">
                 <div class="flex items-center gap-3">
                     <!-- Bot avatar + speaking indicator -->
-                    <div class="relative flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-orange-500 text-xl shadow-lg">
-                        🤖
+                    <div class="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-900/70 ring-1 ring-white/20 shadow-lg">
+                        <img
+                            src="/images/logo/resqmap.png"
+                            alt="ResQMap"
+                            class="h-8 w-8 rounded-full object-contain"
+                        />
                         <!-- Pulse when speaking -->
                         <span
                             v-if="isSpeaking"

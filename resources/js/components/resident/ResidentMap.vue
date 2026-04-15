@@ -2,7 +2,7 @@
 import 'leaflet/dist/leaflet.css';
 import * as L from 'leaflet';
 import { Loader2, RefreshCw } from 'lucide-vue-next';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { nextTick, onMounted, onUnmounted, ref } from 'vue';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -29,6 +29,7 @@ let rescuerLayer: L.LayerGroup | null = null;
 let incidentLayer: L.LayerGroup | null = null;
 let userMarker: L.CircleMarker | null = null;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
+let resizeHandler: (() => void) | null = null;
 
 // ─── Marker factories ─────────────────────────────────────────────────────────
 function makeIncidentIcon(emoji: string, severity: string): L.DivIcon {
@@ -183,6 +184,11 @@ onMounted(async () => {
         attributionControl: false,
     }).setView([14.5995, 120.9842], 12);
 
+    // Important for mobile/tab switches: force Leaflet to re-measure container.
+    await nextTick();
+    setTimeout(() => map?.invalidateSize(), 0);
+    setTimeout(() => map?.invalidateSize(), 180);
+
     // Tile layer (dark style for ResQMap)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         maxZoom: 19,
@@ -203,10 +209,15 @@ onMounted(async () => {
 
     // Auto-refresh rescuer positions every 30 seconds
     refreshTimer = setInterval(fetchRescuers, 30_000);
+
+    // Keep map dimensions correct on viewport changes / orientation changes.
+    resizeHandler = () => map?.invalidateSize();
+    window.addEventListener('resize', resizeHandler);
 });
 
 onUnmounted(() => {
     if (refreshTimer) clearInterval(refreshTimer);
+    if (resizeHandler) window.removeEventListener('resize', resizeHandler);
     map?.remove();
 });
 
