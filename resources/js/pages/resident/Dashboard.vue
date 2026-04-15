@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -101,6 +101,17 @@ function timeAgo(isoDate: string): string {
 const activeIncidents = computed(() => incidentList.value.filter((i) => i.is_active));
 const resolvedIncidents = computed(() => incidentList.value.filter((i) => !i.is_active));
 const firstName = computed(() => user.value.name.split(' ')[0]);
+
+function handleAssistantClose(shouldRefresh = false): void {
+    showReport.value = false;
+
+    if (shouldRefresh) {
+        router.reload({
+            only: ['incidents', 'stats'],
+            preserveScroll: true,
+        });
+    }
+}
 </script>
 
 <template>
@@ -365,7 +376,7 @@ const firstName = computed(() => user.value.name.split(' ')[0]);
         </div>
 
         <!-- ═══ BOTTOM NAVIGATION BAR ═══════════════════════════════════════ -->
-        <nav class="fixed inset-x-0 bottom-0 z-[1000] flex justify-center px-4 pb-5">
+        <nav v-show="!showReport" class="fixed inset-x-0 bottom-0 z-[1000] flex justify-center px-4 pb-5">
             <div class="bottom-nav-shell relative grid w-full max-w-sm grid-cols-5 items-center gap-1 px-2.5 py-3">
 
                 <!-- Home -->
@@ -437,7 +448,7 @@ const firstName = computed(() => user.value.name.split(' ')[0]);
         <AIReportChat
             v-if="showReport"
             :user="user"
-            @close="showReport = false"
+            @close="handleAssistantClose"
         />
     </div>
 </template>

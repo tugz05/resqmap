@@ -13,7 +13,7 @@ import { nextTick, onMounted, onUnmounted, ref } from 'vue';
 
 // ─── Props & Emits ────────────────────────────────────────────────────────────
 const props = defineProps<{ user: { id: number; name: string } }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: [shouldRefresh?: boolean] }>();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Stage =
@@ -60,6 +60,8 @@ const voiceSupported = ref(false);   // browser supports STT
 const interimTranscript = ref('');   // live STT preview
 let recognition: InstanceType<typeof window.SpeechRecognition> | null = null;
 let currentAudio: HTMLAudioElement | null = null;
+let activeTtsController: AbortController | null = null;
+const isUnmounting = ref(false);
 
 // ─── Option sets ─────────────────────────────────────────────────────────────
 const incidentTypes: IncidentOption[] = [
@@ -151,7 +153,7 @@ async function askAI(userMessage?: string): Promise<string> {
 
 // ─── OpenAI TTS ───────────────────────────────────────────────────────────────
 async function speakWithOpenAI(text: string): Promise<void> {
-    if (!voiceEnabled.value) return;
+    if (!voiceEnabled.value || isUnmounting.value) return;
 
     // Cancel any active speech
     stopSpeaking();
@@ -159,7 +161,7 @@ async function speakWithOpenAI(text: string): Promise<void> {
     let browserFallbackUsed = false;
 
     const startBrowserFallback = (): void => {
-        if (browserFallbackUsed) return;
+        if (browserFallbackUsed || isUnmounting.value) return;
         browserFallbackUsed = true;
         speakBrowser(plainText);
     };
@@ -171,6 +173,7 @@ async function speakWithOpenAI(text: string): Promise<void> {
 
     // Hard timeout for slow network/API responses.
     const controller = new AbortController();
+    activeTtsController = controller;
     const requestTimeout = setTimeout(() => controller.abort(), 4500);
 
     try {
@@ -189,7 +192,7 @@ async function speakWithOpenAI(text: string): Promise<void> {
         if (!res.ok) throw new Error('TTS error');
 
         // Browser fallback already started; avoid double-speaking.
-        if (browserFallbackUsed) return;
+        if (browserFallbackUsed || isUnmounting.value) return;
 
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
@@ -209,6 +212,9 @@ async function speakWithOpenAI(text: string): Promise<void> {
     } finally {
         clearTimeout(fallbackTimer);
         clearTimeout(requestTimeout);
+        if (activeTtsController === controller) {
+            activeTtsController = null;
+        }
     }
 }
 
@@ -234,6 +240,13 @@ function stopSpeaking(): void {
     currentAudio = null;
     window.speechSynthesis?.cancel();
     isSpeaking.value = false;
+}
+
+function handleClose(forceRefresh = false): void {
+    isUnmounting.value = true;
+    activeTtsController?.abort();
+    stopSpeaking();
+    emit('close', forceRefresh || submittedId.value !== '');
 }
 
 function stripMarkdown(text: string): string {
@@ -520,6 +533,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+    isUnmounting.value = true;
+    activeTtsController?.abort();
     recognition?.stop();
     stopSpeaking();
 });
@@ -527,7 +542,7 @@ onUnmounted(() => {
 
 <template>
     <Transition name="slide-up">
-        <div class="fixed inset-0 z-[100] flex flex-col bg-[#0d1117]">
+        <div class="fixed inset-0 z-[1200] flex flex-col bg-[#0d1117]">
 
             <!-- ═══ HEADER ══════════════════════════════════════════════════ -->
             <div class="flex shrink-0 items-center justify-between border-b border-white/8 px-4 py-3">
@@ -581,7 +596,7 @@ onUnmounted(() => {
 
                     <button
                         class="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-white/8 hover:text-white"
-                        @click="emit('close')"
+                        @click="handleClose()"
                     >
                         <X class="h-5 w-5" />
                     </button>
@@ -720,7 +735,7 @@ onUnmounted(() => {
                     <button class="flex-1 rounded-xl bg-gradient-to-r from-rose-600 to-orange-500 py-3 text-sm font-bold text-white active:scale-95" @click="submitReport">
                         🔁 Sulayi Pag-usab
                     </button>
-                    <button class="flex-1 rounded-xl bg-[#1c2333] py-3 text-sm text-slate-400 active:scale-95" @click="emit('close')">
+                    <button class="flex-1 rounded-xl bg-[#1c2333] py-3 text-sm text-slate-400 active:scale-95" @click="handleClose()">
                         Kanselahon
                     </button>
                 </div>
@@ -729,7 +744,7 @@ onUnmounted(() => {
                 <div v-else-if="stage === 'done' && !isTyping" class="p-3">
                     <button
                         class="w-full rounded-xl bg-green-800/40 py-4 text-sm font-semibold text-green-300 ring-1 ring-green-700 active:scale-95"
-                        @click="emit('close')"
+                        @click="handleClose(true)"
                     >
                         ✅ Tapos na — Isira
                     </button>

@@ -19,14 +19,14 @@ defineOptions({ layout: AuthSplitResqmapLayout });
     <Head title="Register" />
 
     <!-- Page heading -->
-    <div class="mb-6">
+    <div class="mb-7">
         <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
             Create your account
         </h1>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+        <p class="mt-1 max-w-sm text-sm leading-relaxed text-slate-500 dark:text-slate-400">
             Join ResQMap as a Resident — free, fast, and always available.
         </p>
-        <p class="mt-2 inline-flex items-center rounded-full border border-red-200/70 bg-red-50 px-3 py-1 text-xs font-medium text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+        <p class="mt-2 inline-flex items-center rounded-full border border-blue-200/70 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-300">
             Includes AI-assisted triage and voice-guided reporting.
         </p>
     </div>
@@ -44,7 +44,7 @@ defineOptions({ layout: AuthSplitResqmapLayout });
         v-bind="store.form()"
         :reset-on-success="['password', 'password_confirmation']"
         v-slot="{ errors, processing }"
-        class="flex flex-col gap-4"
+        class="flex flex-col gap-5"
     >
         <!-- Full name -->
         <div class="grid gap-1.5">
@@ -84,7 +84,7 @@ defineOptions({ layout: AuthSplitResqmapLayout });
         </div>
 
         <!-- Password row -->
-        <div class="grid gap-4 sm:grid-cols-2">
+        <div class="grid gap-4 md:grid-cols-2">
             <div class="grid gap-1.5">
                 <Label for="password" class="text-sm font-medium text-slate-700 dark:text-slate-300">
                     Password
@@ -102,7 +102,7 @@ defineOptions({ layout: AuthSplitResqmapLayout });
             </div>
             <div class="grid gap-1.5">
                 <Label for="password_confirmation" class="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Confirm
+                    Confirm password
                 </Label>
                 <PasswordInput
                     id="password_confirmation"
@@ -117,8 +117,12 @@ defineOptions({ layout: AuthSplitResqmapLayout });
             </div>
         </div>
 
+        <p class="-mt-2 text-xs text-slate-500 dark:text-slate-400">
+            Use at least <span class="font-semibold text-slate-700 dark:text-slate-300">12 characters</span> for stronger account security.
+        </p>
+
         <!-- Terms -->
-        <p class="text-xs text-slate-400 dark:text-slate-500">
+        <p class="text-xs leading-relaxed text-slate-500 dark:text-slate-500">
             By creating an account you agree to our
             <span class="font-medium text-slate-600 dark:text-slate-400">Terms of Service</span>
             and
