@@ -26,6 +26,9 @@ defineOptions({ layout: AuthSplitResqmapLayout });
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Join ResQMap as a Resident — free, fast, and always available.
         </p>
+        <p class="mt-2 inline-flex items-center rounded-full border border-red-200/70 bg-red-50 px-3 py-1 text-xs font-medium text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+            Includes AI-assisted triage and voice-guided reporting.
+        </p>
     </div>
 
     <!-- Resident notice -->

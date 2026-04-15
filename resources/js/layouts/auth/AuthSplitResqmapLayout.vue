@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { MapPin, Shield, Users } from 'lucide-vue-next';
+import { Bot, MapPin, Mic, Shield } from 'lucide-vue-next';
 import { home } from '@/routes';
 
 const incidents = [
@@ -82,20 +82,29 @@ const incidents = [
                         </li>
                         <li class="flex items-start gap-3">
                             <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400">
-                                <Shield class="h-4 w-4" />
+                                <Bot class="h-4 w-4" />
                             </div>
                             <div>
-                                <div class="text-sm font-semibold text-white">Instant Rescuer Dispatch</div>
-                                <div class="text-xs text-slate-500">Verified reports routed to nearest teams</div>
+                                <div class="text-sm font-semibold text-white">AI-Assisted Incident Triage</div>
+                                <div class="text-xs text-slate-500">ResQBot asks smart follow-up questions for complete reports</div>
                             </div>
                         </li>
                         <li class="flex items-start gap-3">
                             <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/15 text-blue-400">
-                                <Users class="h-4 w-4" />
+                                <Mic class="h-4 w-4" />
                             </div>
                             <div>
-                                <div class="text-sm font-semibold text-white">Real-time Status Updates</div>
-                                <div class="text-xs text-slate-500">Every stakeholder stays informed, always</div>
+                                <div class="text-sm font-semibold text-white">Voice-Powered Reporting</div>
+                                <div class="text-xs text-slate-500">Speak naturally while AI converts details into structured reports</div>
+                            </div>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+                                <Shield class="h-4 w-4" />
+                            </div>
+                            <div>
+                                <div class="text-sm font-semibold text-white">Instant Rescuer Dispatch</div>
+                                <div class="text-xs text-slate-500">Verified reports routed to nearest teams in real time</div>
                             </div>
                         </li>
                     </ul>

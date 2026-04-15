@@ -216,7 +216,7 @@ const firstName = computed(() => user.value.name.split(' ')[0]);
         </div>
 
         <!-- MAP TAB ──────────────────────────────────────────────────────── -->
-        <div v-if="activeTab === 'map'" class="h-[calc(100svh-8rem)]">
+        <div v-if="activeTab === 'map'" class="h-[calc(100svh-10rem)]">
             <ResidentMap :incidents="incidentList" />
         </div>
 

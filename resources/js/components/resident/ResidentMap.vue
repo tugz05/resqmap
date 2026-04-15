@@ -262,7 +262,7 @@ function manualRefresh(): void {
         </button>
 
         <!-- Last updated -->
-        <div class="absolute bottom-20 right-3 z-[400] rounded-xl bg-black/60 px-3 py-1.5 text-[10px] text-slate-400 backdrop-blur-sm">
+        <div class="absolute bottom-3 right-3 z-[400] rounded-xl bg-black/60 px-3 py-1.5 text-[10px] text-slate-400 backdrop-blur-sm">
             Updated {{ lastRefresh.toLocaleTimeString() }}
         </div>
     </div>

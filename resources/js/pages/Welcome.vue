@@ -7,11 +7,13 @@ import {
     Activity,
     AlertCircle,
     ArrowRight,
+    Bot,
     CheckCircle2,
     ChevronDown,
     Clock,
     MapPin,
     Menu,
+    Mic,
     Moon,
     Radio,
     Shield,
@@ -205,7 +207,10 @@ const floatingIncidents = [
                     <strong class="font-semibold text-slate-900 dark:text-slate-200">residents</strong>,
                     <strong class="font-semibold text-slate-900 dark:text-slate-200">rescuers</strong>,
                     and <strong class="font-semibold text-slate-900 dark:text-slate-200">administrators</strong>
-                    for faster emergency response.
+                    for faster emergency response with
+                    <strong class="font-semibold text-red-600 dark:text-red-400">AI-assisted triage</strong>
+                    and
+                    <strong class="font-semibold text-red-600 dark:text-red-400">voice-powered reporting</strong>.
                 </p>
 
                 <!-- CTA -->
@@ -251,7 +256,7 @@ const floatingIncidents = [
                     <div v-for="stat in [
                         { value: '3', label: 'Dedicated Roles', icon: Users },
                         { value: 'GPS', label: 'Pinpoint Accuracy', icon: MapPin },
-                        { value: 'Live', label: 'Incident Tracking', icon: Zap },
+                        { value: 'AI', label: 'Assisted Triage', icon: Bot },
                         { value: '24/7', label: 'Always Available', icon: Clock },
                     ]" :key="stat.label" class="stat-card rounded-2xl px-4 py-5">
                         <component :is="stat.icon" class="mx-auto mb-2 h-5 w-5 text-red-500" />
@@ -274,10 +279,10 @@ const floatingIncidents = [
                 <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                     <div v-for="feat in [
                         { icon: MapPin,      color: 'red',    title: 'Geotagged Reporting',     desc: 'Pin exact incident locations on an interactive map with precise GPS coordinates for instant dispatching.' },
-                        { icon: Activity,   color: 'amber',  title: 'Real-time Monitoring',    desc: 'Live dashboard updates as incidents are reported, verified, and resolved — always fully informed.' },
+                        { icon: Bot,        color: 'amber',  title: 'AI-Assisted Reporting',   desc: 'ResQBot guides residents with smart follow-up questions so reports are complete, clear, and actionable.' },
                         { icon: Shield,     color: 'blue',   title: 'Multi-role Access',       desc: 'Purpose-built dashboards for Residents, Rescuers, and Administrators with exactly the tools each needs.' },
                         { icon: Users,      color: 'green',  title: 'Rescuer Dispatch',        desc: 'Assign and track rescuers to active incidents with full operational visibility across all teams.' },
-                        { icon: Radio,      color: 'purple', title: 'Incident Categorization', desc: 'Classify by type and severity — floods, fires, medical emergencies — for prioritized response.' },
+                        { icon: Mic,        color: 'purple', title: 'Voice-Powered Input',     desc: 'Residents can speak incident details hands-free while AI captures and structures critical information.' },
                         { icon: Clock,      color: 'slate',  title: 'Response Timeline',       desc: 'Track every step from report submission to on-scene arrival and final resolution.' },
                     ]" :key="feat.title"
                         class="feature-card group relative rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-white/6 dark:bg-white/3"

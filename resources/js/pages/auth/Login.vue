@@ -33,6 +33,9 @@ defineProps<{
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Log in to access your ResQMap dashboard
         </p>
+        <p class="mt-2 inline-flex items-center rounded-full border border-red-200/70 bg-red-50 px-3 py-1 text-xs font-medium text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+            AI-assisted and voice-powered emergency reporting is ready.
+        </p>
     </div>
 
     <!-- Success status (e.g. after password reset) -->
