@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
     AlertTriangle,
     Bell,
     CheckCircle2,
     ChevronRight,
     Clock,
+    LogOut,
     Siren,
     Home,
     Map,
@@ -15,6 +24,7 @@ import {
 import { computed, ref } from 'vue';
 import AIReportChat from '@/components/resident/AIReportChat.vue';
 import ResidentMap from '@/components/resident/ResidentMap.vue';
+import { logout } from '@/routes';
 
 // ─── Incident shape ───────────────────────────────────────────────────────────
 type Incident = {
@@ -112,9 +122,46 @@ const firstName = computed(() => user.value.name.split(' ')[0]);
                 <button class="relative rounded-xl p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">
                     <Bell class="h-5 w-5" />
                 </button>
-                <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-rose-600 text-xs font-bold text-white">
-                    {{ firstName.charAt(0).toUpperCase() }}
-                </div>
+                <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                        <button
+                            class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-rose-600 text-xs font-bold text-white ring-offset-2 transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-red-400 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950"
+                            aria-label="Open account menu"
+                        >
+                            {{ firstName.charAt(0).toUpperCase() }}
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                        side="bottom"
+                        align="end"
+                        :side-offset="6"
+                        :align-offset="-2"
+                        :collision-padding="12"
+                        class="z-[70] min-w-52 rounded-xl"
+                    >
+                        <DropdownMenuLabel class="px-2 py-2">
+                            <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                {{ user.name }}
+                            </div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">
+                                {{ user.email }}
+                            </div>
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem as-child>
+                            <Link href="/settings/profile" class="cursor-pointer">
+                                <Settings class="mr-2 h-4 w-4" />
+                                Settings
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem as-child>
+                            <Link :href="logout()" as="button" class="w-full cursor-pointer text-red-600 dark:text-red-400">
+                                <LogOut class="mr-2 h-4 w-4" />
+                                Log out
+                            </Link>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </header>
 
@@ -216,7 +263,7 @@ const firstName = computed(() => user.value.name.split(' ')[0]);
         </div>
 
         <!-- MAP TAB ──────────────────────────────────────────────────────── -->
-        <div v-if="activeTab === 'map'" class="h-[calc(100svh-10rem)]">
+        <div v-if="activeTab === 'map'" class="h-[calc(100svh-4rem)]">
             <ResidentMap :incidents="incidentList" />
         </div>
 
@@ -318,7 +365,7 @@ const firstName = computed(() => user.value.name.split(' ')[0]);
         </div>
 
         <!-- ═══ BOTTOM NAVIGATION BAR ═══════════════════════════════════════ -->
-        <nav class="fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-5">
+        <nav class="fixed inset-x-0 bottom-0 z-[1000] flex justify-center px-4 pb-5">
             <div class="bottom-nav-shell relative grid w-full max-w-sm grid-cols-5 items-center gap-1 px-2.5 py-3">
 
                 <!-- Home -->
