@@ -1,14 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
     AlertTriangle,
     Bell,
     CheckCircle2,
@@ -21,10 +13,22 @@ import {
     Settings,
     FileText,
 } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AIReportChat from '@/components/resident/AIReportChat.vue';
 import ResidentMap from '@/components/resident/ResidentMap.vue';
+import LiveTrackingMap from '@/components/tracking/LiveTrackingMap.vue';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { echoClient } from '@/echo';
 import { logout } from '@/routes';
+
+type LatLng = { latitude: number; longitude: number } | null | undefined;
 
 // ─── Incident shape ───────────────────────────────────────────────────────────
 type Incident = {
@@ -43,6 +47,16 @@ type Incident = {
     location: { latitude: number; longitude: number; address?: string; barangay?: string; city?: string };
     reported_at: string;
     resolved_at?: string;
+    reporter_location?: LatLng;
+    rescuer_location?: LatLng;
+    assigned_rescuer?: {
+        id?: number;
+        name?: string;
+        agency?: string | null;
+        contact?: string | null;
+        status?: string;
+        status_label?: string;
+    } | null;
 };
 
 // ─── Props (from DashboardController) ────────────────────────────────────────
@@ -63,10 +77,15 @@ const showReport = ref(false);
 // Renamed to `incidentList` to avoid conflicting with the defineProps `incidents` binding.
 const incidentList = computed<Incident[]>(() => {
     const raw = props.incidents;
-    if (Array.isArray(raw)) return raw;
+
+    if (Array.isArray(raw)) {
+return raw;
+}
+
     if (raw && typeof raw === 'object' && Array.isArray((raw as { data: Incident[] }).data)) {
         return (raw as { data: Incident[] }).data;
     }
+
     return [];
 });
 
@@ -91,10 +110,21 @@ const severityDot: Record<string, string> = {
 function timeAgo(isoDate: string): string {
     const diff = Date.now() - new Date(isoDate).getTime();
     const m = Math.floor(diff / 60000);
-    if (m < 1) return 'just now';
-    if (m < 60) return `${m}m ago`;
+
+    if (m < 1) {
+return 'just now';
+}
+
+    if (m < 60) {
+return `${m}m ago`;
+}
+
     const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
+
+    if (h < 24) {
+return `${h}h ago`;
+}
+
     return `${Math.floor(h / 24)}d ago`;
 }
 
@@ -102,13 +132,191 @@ const activeIncidents = computed(() => incidentList.value.filter((i) => i.is_act
 const resolvedIncidents = computed(() => incidentList.value.filter((i) => !i.is_active));
 const firstName = computed(() => user.value.name.split(' ')[0]);
 
+// Grab-style tracking: the active incident that currently has a rescuer en route.
+const trackedIncident = computed<Incident | null>(
+    () =>
+        activeIncidents.value.find(
+            (i) => i.assigned_rescuer && ['dispatched', 'en_route', 'on_scene'].includes(i.status),
+        ) ?? null,
+);
+
+// Poll for rescuer position + incident status every few seconds when the tab
+// is visible and there is something worth tracking.
+let livePollTimer: ReturnType<typeof setInterval> | null = null;
+let gpsWatchId: number | null = null;
+let gpsPushTimer: ReturnType<typeof setInterval> | null = null;
+const currentGps = ref<{ latitude: number; longitude: number } | null>(null);
+
+async function pushLocation(lat: number, lng: number): Promise<void> {
+    try {
+        const tokenMeta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]');
+        await fetch('/location/ping', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                ...(tokenMeta ? { 'X-CSRF-TOKEN': tokenMeta.content } : {}),
+            },
+            body: JSON.stringify({ latitude: lat, longitude: lng }),
+        });
+    } catch {
+        /* silent */
+    }
+}
+
+// ─── Pusher subscriptions (live rescuer tracking) ───────────────────────────
+// Rescuer's live position on the map. Fed by `.user.location-moved` on the
+// `incident.{ulid}.rescuer` private channel — exactly how Grab shows a
+// driver closing in.
+const rescuerLivePosition = ref<{ latitude: number; longitude: number } | null>(null);
+let trackedChannel: string | null = null;
+let trackedRescuerChannel: string | null = null;
+
+function reloadIncidents(): void {
+    router.reload({ only: ['incidents', 'stats'], preserveUrl: true });
+}
+
+function subscribeToTrackedIncident(): void {
+    const echo = echoClient();
+
+    if (!echo) {
+return;
+}
+
+    const ulid = trackedIncident.value?.id;
+
+    if (!ulid) {
+return;
+}
+
+    const incidentChannel = `incident.${ulid}`;
+    const rescuerChannel = `incident.${ulid}.rescuer`;
+
+    if (trackedChannel && trackedChannel !== incidentChannel) {
+        try {
+ echo.leave(trackedChannel); 
+} catch { /* ignore */ }
+    }
+
+    if (trackedRescuerChannel && trackedRescuerChannel !== rescuerChannel) {
+        try {
+ echo.leave(trackedRescuerChannel); 
+} catch { /* ignore */ }
+
+        rescuerLivePosition.value = null;
+    }
+
+    trackedChannel = incidentChannel;
+    trackedRescuerChannel = rescuerChannel;
+
+    echo.private(incidentChannel)
+        .listen('.incident.status-changed', () => reloadIncidents())
+        .listen('.incident.rescuer-assigned', () => reloadIncidents())
+        .listen('.incident.ai-verified', () => reloadIncidents())
+        .listen('.incident.assignment-status-changed', () => reloadIncidents());
+
+    echo.private(rescuerChannel)
+        .listen('.user.location-moved', (payload: unknown) => {
+            const p = payload as { latitude?: number; longitude?: number };
+
+            if (typeof p.latitude === 'number' && typeof p.longitude === 'number') {
+                rescuerLivePosition.value = { latitude: p.latitude, longitude: p.longitude };
+            }
+        });
+}
+
+// If the resident files a new report or the tracked incident changes,
+// re-point the Pusher subscriptions at the new incident ULID.
+watch(
+    () => trackedIncident.value?.id,
+    (newUlid, oldUlid) => {
+        if (newUlid === oldUlid) {
+return;
+}
+
+        rescuerLivePosition.value = null;
+        subscribeToTrackedIncident();
+    },
+);
+
+onMounted(() => {
+    // Fallback polling — every 30s only. Pusher is primary.
+    livePollTimer = setInterval(() => {
+        if (document.visibilityState !== 'visible') {
+return;
+}
+
+        if (activeIncidents.value.length === 0) {
+return;
+}
+
+        reloadIncidents();
+    }, 30000);
+
+    // Push the resident's GPS so rescuers + admins can see the scene live.
+    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+        gpsWatchId = navigator.geolocation.watchPosition(
+            (pos) => {
+                currentGps.value = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+            },
+            () => { /* ignore */ },
+            { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 },
+        );
+    }
+
+    gpsPushTimer = setInterval(() => {
+        if (!currentGps.value) {
+return;
+}
+
+        if (activeIncidents.value.length === 0) {
+return;
+}
+
+        pushLocation(currentGps.value.latitude, currentGps.value.longitude);
+    }, 8000);
+
+    subscribeToTrackedIncident();
+});
+
+onBeforeUnmount(() => {
+    if (livePollTimer) {
+clearInterval(livePollTimer);
+}
+
+    if (gpsPushTimer) {
+clearInterval(gpsPushTimer);
+}
+
+    if (gpsWatchId !== null && typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+        navigator.geolocation.clearWatch(gpsWatchId);
+    }
+
+    const echo = echoClient();
+
+    if (echo) {
+        if (trackedChannel) {
+ try {
+ echo.leave(trackedChannel); 
+} catch { /* ignore */ } 
+}
+
+        if (trackedRescuerChannel) {
+ try {
+ echo.leave(trackedRescuerChannel); 
+} catch { /* ignore */ } 
+}
+    }
+});
+
 function handleAssistantClose(shouldRefresh = false): void {
     showReport.value = false;
 
     if (shouldRefresh) {
         router.reload({
             only: ['incidents', 'stats'],
-            preserveScroll: true,
+            preserveUrl: true,
         });
     }
 }
@@ -203,6 +411,76 @@ function handleAssistantClose(shouldRefresh = false): void {
                 <div class="rounded-2xl bg-green-50 p-3 text-center shadow-sm dark:bg-green-950/30">
                     <div class="text-2xl font-bold text-green-600 dark:text-green-400">{{ stats.resolved }}</div>
                     <div class="mt-0.5 text-xs text-green-600/70 dark:text-green-400/70">Resolved</div>
+                </div>
+            </div>
+
+            <!-- ═══ LIVE TRACKING (Grab-style) ════════════════════════════ -->
+            <div
+                v-if="trackedIncident"
+                class="mb-6 overflow-hidden rounded-3xl bg-white shadow-lg ring-1 ring-slate-200/60 dark:bg-slate-900 dark:ring-slate-800"
+            >
+                <div class="flex items-center gap-2 border-b border-slate-200/60 bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2.5 text-white dark:border-slate-800">
+                    <span class="flex h-2 w-2">
+                        <span class="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-white/80" />
+                        <span class="relative inline-flex h-2 w-2 rounded-full bg-white" />
+                    </span>
+                    <span class="text-xs font-bold uppercase tracking-wider">Rescuer on the way</span>
+                    <span class="ml-auto text-[10px] opacity-90">live</span>
+                </div>
+
+                <LiveTrackingMap
+                    :key="trackedIncident.id"
+                    :incident="{
+                        latitude: trackedIncident.location.latitude,
+                        longitude: trackedIncident.location.longitude,
+                        title: trackedIncident.title,
+                        type_icon: trackedIncident.type_icon,
+                    }"
+                    :reporter="trackedIncident.reporter_location"
+                    :rescuer="rescuerLivePosition ?? trackedIncident.rescuer_location"
+                    :rescuer-name="trackedIncident.assigned_rescuer?.name ?? null"
+                    :rescuer-status="trackedIncident.assigned_rescuer?.status_label ?? null"
+                    height="260px"
+                />
+
+                <div class="flex items-center gap-3 p-4">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
+                        <Siren class="h-5 w-5" />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-bold text-slate-900 dark:text-white">
+                            {{ trackedIncident.assigned_rescuer?.name ?? 'Rescuer' }}
+                        </p>
+                        <p class="truncate text-xs text-slate-500 dark:text-slate-400">
+                            <span v-if="trackedIncident.assigned_rescuer?.agency">{{ trackedIncident.assigned_rescuer.agency }}</span>
+                            <span v-if="trackedIncident.assigned_rescuer?.agency && trackedIncident.assigned_rescuer?.status_label"> · </span>
+                            <span class="font-medium text-emerald-600 dark:text-emerald-400">{{ trackedIncident.assigned_rescuer?.status_label ?? 'En route' }}</span>
+                        </p>
+                    </div>
+                    <a
+                        v-if="trackedIncident.assigned_rescuer?.contact"
+                        :href="`tel:${trackedIncident.assigned_rescuer.contact}`"
+                        class="flex h-11 items-center gap-1.5 rounded-full bg-emerald-600 px-4 text-sm font-bold text-white shadow-md shadow-emerald-600/30 transition active:scale-95"
+                    >
+                        <Bell class="h-4 w-4" />
+                        Call
+                    </a>
+                </div>
+            </div>
+
+            <!-- Waiting-for-rescuer card (verified but no rescuer yet) -->
+            <div
+                v-else-if="activeIncidents.some((i) => i.status === 'verified' && !i.assigned_rescuer)"
+                class="mb-6 flex items-start gap-3 rounded-3xl bg-gradient-to-br from-amber-50 to-orange-50 p-4 ring-1 ring-amber-200 dark:from-amber-950/40 dark:to-orange-950/40 dark:ring-amber-900/60"
+            >
+                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
+                    <Clock class="h-5 w-5" />
+                </div>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Matching you with a rescuer…</p>
+                    <p class="mt-0.5 text-xs text-amber-800/80 dark:text-amber-300/80">
+                        Your report was verified. AI is finding the nearest rescuer now.
+                    </p>
                 </div>
             </div>
 

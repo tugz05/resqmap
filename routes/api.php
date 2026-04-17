@@ -58,8 +58,10 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->group(function (): void {
         Route::get('nearby',   [IncidentController::class, 'nearby']); // active incidents near point
         Route::get('{incident}',          [IncidentController::class, 'show']);         // single incident
         Route::patch('{incident}/status', [IncidentController::class, 'updateStatus']); // change status
-        Route::post('{incident}/assign',  [IncidentController::class, 'assign'])        // assign rescuer
-            ->middleware('role:admin');
+        Route::post('{incident}/ai-verify',      [IncidentController::class, 'aiVerify'])
+            ->middleware('role:admin'); // re-queue OpenAI image verification
+        Route::post('{incident}/retry-dispatch', [IncidentController::class, 'retryDispatch'])
+            ->middleware('role:admin'); // re-run AI Dispatch Agent (nearest rescuer)
     });
 
     // Assignments (rescuer perspective) ────────────────────────────────────────

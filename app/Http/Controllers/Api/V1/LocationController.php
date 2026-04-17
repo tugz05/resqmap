@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\UserRole;
+use App\Events\UserLocationMoved;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Location\UpdateLocationRequest;
 use App\Http\Resources\UserLocationResource;
 use App\Models\User;
 use App\Models\UserLocation;
+use App\Support\LocationBroadcastResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,14 +22,21 @@ class LocationController extends Controller
      */
     public function update(UpdateLocationRequest $request): JsonResponse
     {
+        $user = $request->user();
+
         $location = UserLocation::updateOrCreate(
-            ['user_id' => $request->user()->id],
+            ['user_id' => $user->id],
             [
                 ...$request->validated(),
-                'is_active'  => true,
+                'is_active' => true,
                 'located_at' => now(),
             ],
         );
+
+        $ulids = LocationBroadcastResolver::activeIncidentUlidsFor($user);
+        if ($ulids !== []) {
+            UserLocationMoved::dispatch($user, $location, $ulids);
+        }
 
         return response()->json([
             'location' => new UserLocationResource($location),
@@ -60,7 +69,7 @@ class LocationController extends Controller
 
         return response()->json([
             'rescuers' => UserLocationResource::collection($locations),
-            'total'    => $locations->count(),
+            'total' => $locations->count(),
         ]);
     }
 
@@ -70,7 +79,7 @@ class LocationController extends Controller
     public function nearby(Request $request): JsonResponse
     {
         $request->validate([
-            'latitude'  => ['required', 'numeric', 'between:-90,90'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'radius_km' => ['nullable', 'numeric', 'between:1,100'],
         ]);
@@ -87,7 +96,7 @@ class LocationController extends Controller
 
         return response()->json([
             'locations' => UserLocationResource::collection($locations),
-            'total'     => $locations->count(),
+            'total' => $locations->count(),
         ]);
     }
 }

@@ -6,16 +6,14 @@ use App\Enums\IncidentStatus;
 use App\Enums\IncidentType;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Api\V1\Incident\AssignRescuerRequest;
 use App\Http\Requests\Api\V1\Incident\StoreIncidentRequest;
 use App\Http\Requests\Api\V1\Incident\UpdateIncidentStatusRequest;
-use App\Http\Resources\IncidentAssignmentResource;
 use App\Http\Resources\IncidentResource;
+use App\Jobs\AutoAssignRescuerJob;
+use App\Jobs\VerifyIncidentAi;
 use App\Models\Incident;
-use App\Models\IncidentAssignment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 
 class IncidentController extends Controller
 {
@@ -78,7 +76,11 @@ class IncidentController extends Controller
 
     /**
      * Create a new incident report from the mobile app.
-     * Photos are stored in storage/app/public/incidents/{ulid}/.
+     *
+     * Photos are stored in storage/app/public/incidents/{ulid}/. The heavy
+     * OpenAI vision verification is dispatched to the queue by IncidentObserver
+     * so the reporter gets an instant response while analysis runs in the
+     * background. Clients can poll GET /incidents/{ulid} to see the verdict.
      */
     public function store(StoreIncidentRequest $request): JsonResponse
     {
@@ -98,6 +100,11 @@ class IncidentController extends Controller
 
         return response()->json([
             'incident' => new IncidentResource($incident->load('reporter')),
+            'ai_verification' => [
+                'status' => $incident->ai_verification_status,
+                'queued_at' => $incident->ai_verification_queued_at?->toISOString(),
+                'message' => 'AI verification is running in the background.',
+            ],
             'message'  => 'Incident reported successfully.',
         ], 201);
     }
@@ -119,6 +126,9 @@ class IncidentController extends Controller
 
     /**
      * Update incident status. Enforces role-based transition rules.
+     *
+     * When an admin flips a report to "verified", the AI Dispatch Agent is
+     * triggered automatically — admins do not pick rescuers manually.
      */
     public function updateStatus(UpdateIncidentStatusRequest $request, Incident $incident): JsonResponse
     {
@@ -143,6 +153,14 @@ class IncidentController extends Controller
 
         $incident->update(['status' => $newStatus, ...$timestamps]);
 
+        if (
+            $user->isAdmin()
+            && $newStatus === IncidentStatus::Verified
+            && ! $incident->assignments()->exists()
+        ) {
+            AutoAssignRescuerJob::dispatch($incident->id);
+        }
+
         return response()->json([
             'incident' => new IncidentResource($incident),
             'message'  => "Status updated to [{$newStatus->label()}].",
@@ -150,31 +168,47 @@ class IncidentController extends Controller
     }
 
     /**
-     * Assign a rescuer to an incident (Admin only).
+     * Re-queue the AI Dispatch Agent for an incident that didn't get a
+     * rescuer the first time (e.g. none were online). Admin-only.
      */
-    public function assign(AssignRescuerRequest $request, Incident $incident): JsonResponse
+    public function retryDispatch(Incident $incident): JsonResponse
     {
-        $assignment = IncidentAssignment::updateOrCreate(
-            ['incident_id' => $incident->id, 'rescuer_id' => $request->rescuer_id],
-            [
-                'assigned_by' => $request->user()->id,
-                'status'      => \App\Enums\AssignmentStatus::Assigned,
-                'notes'       => $request->notes,
-                'assigned_at' => now(),
-            ],
-        );
-
-        if ($incident->status === IncidentStatus::Verified) {
-            $incident->update([
-                'status'        => IncidentStatus::Dispatched,
-                'dispatched_at' => now(),
-            ]);
+        if ($incident->assignments()->exists()) {
+            return response()->json([
+                'message' => 'A rescuer is already assigned.',
+            ], 422);
         }
 
+        AutoAssignRescuerJob::dispatch($incident->id);
+
         return response()->json([
-            'assignment' => new IncidentAssignmentResource($assignment->load(['rescuer', 'assigner'])),
-            'message'    => 'Rescuer assigned successfully.',
-        ], 201);
+            'incident_id' => $incident->ulid,
+            'message' => 'AI Dispatch Agent queued. A rescuer will be matched shortly.',
+        ], 202);
+    }
+
+    /**
+     * Re-queue AI verification for an incident. The job runs in the background
+     * via the database queue; poll GET /incidents/{ulid} for updates.
+     */
+    public function aiVerify(Incident $incident): JsonResponse
+    {
+        $incident->update([
+            'ai_verification_status' => 'pending',
+            'ai_verification_queued_at' => now(),
+            'ai_verification_error' => null,
+        ]);
+
+        VerifyIncidentAi::dispatch($incident->id);
+
+        return response()->json([
+            'incident_id' => $incident->ulid,
+            'ai_verification' => [
+                'status' => 'pending',
+                'queued_at' => $incident->ai_verification_queued_at?->toISOString(),
+            ],
+            'message' => 'AI verification queued. Poll the incident to see the result.',
+        ], 202);
     }
 
     /**

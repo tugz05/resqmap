@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-vue-next';
+import { usePage } from '@inertiajs/vue3';
+import { BarChart3, BookOpen, Cog, FolderGit2, LayoutGrid, Siren, Truck, Users } from 'lucide-vue-next';
+import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -15,15 +17,66 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { dashboard as rescuerDashboard } from '@/routes/rescuer';
+import { dashboard as adminDashboard } from '@/routes/admin';
+import incidents from '@/routes/admin/incidents';
+import users from '@/routes/admin/users';
+import responders from '@/routes/admin/responders';
+import settings from '@/routes/admin/settings';
 import type { NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
+const page = usePage<{ auth: { user: { role?: string } } }>();
+const isAdmin = computed(() => page.props.auth.user.role === 'admin');
+
+const mainNavItems = computed<NavItem[]>(() => {
+    if (!isAdmin.value && page.props.auth.user.role === 'rescuer') {
+        return [
+            {
+                title: 'Rescuer Dashboard',
+                href: rescuerDashboard(),
+                icon: LayoutGrid,
+            },
+        ];
+    }
+
+    if (!isAdmin.value) {
+        return [
+            {
+                title: 'Dashboard',
+                href: dashboard(),
+                icon: LayoutGrid,
+            },
+        ];
+    }
+
+    return [
+        {
+            title: 'Analytics',
+            href: adminDashboard(),
+            icon: BarChart3,
+        },
+        {
+            title: 'Incidents',
+            href: incidents.index(),
+            icon: Siren,
+        },
+        {
+            title: 'Users & Roles',
+            href: users.index(),
+            icon: Users,
+        },
+        {
+            title: 'Responders',
+            href: responders.index(),
+            icon: Truck,
+        },
+        {
+            title: 'Settings',
+            href: settings.index(),
+            icon: Cog,
+        },
+    ];
+});
 
 const footerNavItems: NavItem[] = [
     {

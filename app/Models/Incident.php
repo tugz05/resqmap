@@ -6,8 +6,10 @@ use App\Enums\AssignmentStatus;
 use App\Enums\IncidentSeverity;
 use App\Enums\IncidentStatus;
 use App\Enums\IncidentType;
+use App\Observers\IncidentObserver;
 use Database\Factories\IncidentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +22,22 @@ use Illuminate\Support\Str;
     'type',
     'severity',
     'status',
+    'ai_verdict',
+    'ai_confidence',
+    'ai_summary',
+    'ai_red_flags',
+    'ai_recommended_action',
+    'ai_verifier_model',
+    'ai_verified_at',
+    'ai_verification_status',
+    'ai_verification_queued_at',
+    'ai_verification_started_at',
+    'ai_verification_error',
+    'ai_verification_attempts',
+    'ai_command_center',
+    'ai_commanded_at',
+    'ai_dispatch',
+    'ai_dispatched_at',
     'title',
     'description',
     'latitude',
@@ -35,6 +53,7 @@ use Illuminate\Support\Str;
     'dispatched_at',
     'resolved_at',
 ])]
+#[ObservedBy(IncidentObserver::class)]
 class Incident extends Model
 {
     /** @use HasFactory<IncidentFactory> */
@@ -46,6 +65,16 @@ class Incident extends Model
             'type'          => IncidentType::class,
             'severity'      => IncidentSeverity::class,
             'status'        => IncidentStatus::class,
+            'ai_confidence' => 'integer',
+            'ai_red_flags'  => 'array',
+            'ai_verified_at' => 'datetime',
+            'ai_verification_queued_at' => 'datetime',
+            'ai_verification_started_at' => 'datetime',
+            'ai_verification_attempts' => 'integer',
+            'ai_command_center' => 'array',
+            'ai_commanded_at' => 'datetime',
+            'ai_dispatch' => 'array',
+            'ai_dispatched_at' => 'datetime',
             'photo_paths'   => 'array',
             'latitude'      => 'decimal:7',
             'longitude'     => 'decimal:7',
